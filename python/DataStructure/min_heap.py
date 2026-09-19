@@ -26,8 +26,9 @@ class MinHeap:
 
         # 힙의 최솟값은 배열의 첫 번째 요소이므로 반환
         return self.data[0]
+      
 
-    def extract_max(self):
+    def extract_min(self):
         """
         힙에서 최솟값을 제거하고 반환하는 메서드입니다.
         """
@@ -85,3 +86,11 @@ class MinHeap:
                 index = smallest
             else:
                 break
+
+    
+    def print_data(self):
+        array_size = len(self.data)
+        print(f"heap count: {array_size}")
+
+        for i in range(array_size):
+            print(self.data[i])

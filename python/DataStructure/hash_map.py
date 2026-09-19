@@ -1,8 +1,9 @@
 from DataStructure.double_linked_list import DoubleLinkedList 
+from Redis.entry import Entry
 
 class HashMap:
     # 생성자
-    def __init__(self, size = 16):
+    def __init__(self, size = 8):
         self.size = size
         self.key_count = 0
         self.keys = []
@@ -13,11 +14,14 @@ class HashMap:
             self.keys.append(DoubleLinkedList())  # 각 버킷을 리스트로 초기화
 
     # 메서드
-    def put(self, key, value):
+    def put(self, key, value, expire, lru_node_ptr):
         print(f"Putting key: {key}, value: {value}")
         print(f"Hash index for key '{key}': {hash(key)} : {hash(key) % self.size}")
         index = hash(key) % self.size
-        self.keys[index].insert_back((key, value))
+
+        new_node = Entry(key, value, expire, lru_node_ptr)
+
+        self.keys[index].insert_back(new_node)
 
         # key 개수 증가
         self.key_count += 1
@@ -69,7 +73,11 @@ class HashMap:
 
         double_linked_list = self.keys[index]
 
-        double_linked_list.print_list()
+        find_node = self._find_node(key)
+        
+        if find_node is None:
+            return None
+        return find_node
         # for node in double_linked_list:
         #     k, v = node.get_data()
         #     if k == key:
@@ -86,21 +94,49 @@ class HashMap:
 
     def remove(self, key):
         index = self.get_index(key)
-        dl = self.keys[index]
+        bucket = self.keys[index]
 
-        dl.find()
+        node = self._find_node(key)
+        if node is None:
+            return None
+
+        self.key_count -= 1
+        
+        bucket.remove_node(node)
+        return node
         # print(f"Checking node with key: {node.get_data()[0]}")
 
     def contains_key(self, key):
+        
+        find_key = self._find_node(key)
+        
+        if find_key is None:
+            return False
+        print(find_key.data)
+        return True
+
+    def _find_node(self, key):
         index = self.get_index(key)
-        for dl in self.keys[index]:
-            if dl.get_data_node(key):
-                return True
-        return False
+        bucket = self.keys[index]
+
+        # head는 스킵
+        current = bucket.head.next
+
+        while current is not bucket.tail:
+            entry = current.data
+
+            if entry.key == key:
+                return current
+
+            current = current.next
+
+        return None
 
     def get_key_count(self):
         return self.key_count
 
+    def get_bucket_count(self):
+        return len(self.keys)
 
     def print_all(self):
         for i in range(self.size):

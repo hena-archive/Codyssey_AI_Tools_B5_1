@@ -33,6 +33,8 @@ class DoubleLinkedList:
 
         self.node_count += 1
 
+        return new_node
+
     def insert_back(self, data):
         """
         tail에 새로운 노드를 추가하는 메서드입니다.
@@ -51,6 +53,8 @@ class DoubleLinkedList:
         self.tail.prev = new_node
         
         self.node_count += 1
+
+        return new_node
 
     def remove_front(self):
         """
@@ -120,6 +124,12 @@ class DoubleLinkedList:
             return
         self.remove_node(node)
         self.insert_front(node.data)
+
+    def move_to_back(self, node):
+        if node is None or node == self.head:
+            return
+        self.remove_node(node)
+        self.insert_back(node.data)
 
     # 테스트 용도 함수
     def print_list(self):
