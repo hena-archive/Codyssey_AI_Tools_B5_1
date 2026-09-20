@@ -276,7 +276,7 @@ class MiniRedis:
             remove_key_bytes = self._get_utf8_size(entry.key)
             remove_value_bytes = self._get_utf8_size(entry.value)
             self.total_bytes -= (remove_key_bytes + remove_value_bytes)
-            
+
             return "(integer) 1" 
 
     def _exists_command(self, args):
@@ -502,6 +502,7 @@ class MiniRedis:
                 self.ttl.extract_min()
 
                 if entry.expire_at == expire_at:
+                    self.evicted_keys_count += 1
                     print(f"삭제할 키: {entry.key} 삭제할 value:{entry.value}")
                     print(f"expire 시간: {entry.expire_at} now: {self.current_time} node:{entry.recent_node}")
                     self._delete_command([entry.key])
