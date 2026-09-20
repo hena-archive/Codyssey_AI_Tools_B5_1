@@ -139,6 +139,14 @@ class DoubleLinkedList:
             current = current.next
         print()
 
+    def get_list_data(self):
+        data = []
+        current = self.head.next
+        while current is not self.tail:
+            data.append(current.data)
+            current = current.next
+        return data
+
     def get_first_node(self):
         if self.head.next is self.tail:
             return None

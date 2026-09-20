@@ -31,11 +31,17 @@ class MiniRedis:
             self._clear_ttl()
             
             response = self._handle_request(request)
-            print(response)
+            if response == False:
+                return
+            
 
     def _parse_args(self, args):
         command = ""
         new_args = []
+
+        if len(args) == 0:
+            command = ""
+            return command, new_args
 
         if args[0] == "SET" or args[0] == "GET" or args[0] == "DEL" or args[0] == "EXISTS" or args[0] == "KEYS" or args[0] == "DBSIZE":
             command = args[0]
@@ -51,7 +57,12 @@ class MiniRedis:
         elif args[0] == "EXPIRE" or args[0] == "TTL":
             command = args[0]
             new_args = args[1:]
+        elif args[0] == 'DEBUG_HEAP' or args[0] == 'DEBUG_HASH' or  args[0] == 'DEBUG_LRU':
+            command = args[0]
+        elif args[0] == 'EXIT' or args[0] == 'QUIT':
+            command = args[0]
         else:
+            command = args[0]
             print(f"Error {args[0]} \n")
         return command, new_args
 
@@ -70,9 +81,19 @@ class MiniRedis:
             return True
         elif command == "CONFIG SET maxmemory":
             return True
+        elif command == "INFO memory":
+            return True
         elif command == "EXPIRE":
             return True
         elif command == "TTL":
+            return True
+        elif command == "DEBUG_HEAP":
+            return True
+        elif command == "DEBUG_LRU":
+            return True
+        elif command == "DEBUG_HASH":
+            return True
+        elif command == "QUIT" or command == "EXIT":
             return True
         return False
 
@@ -94,13 +115,16 @@ class MiniRedis:
         
         self._print_input_command_and_args(command, args)
 
+        result_message = ""
+
         # 제대로 들어왔는지 확인하기
         check_flag = self._check_parse_validate(command, args)
         if check_flag == False:
-            print("여기냐")
-            return False
+            result_message = f"(error) ERR unknown command <{command}>"
+            print(result_message)
+            return True
 
-        result_message = ""
+        
 
         # String 타입 명령어 6개
         # - SET, GET, DEL, EXISTS, DBSIZE, KEYS
@@ -122,6 +146,7 @@ class MiniRedis:
         elif command == "CONFIG SET maxmemory":
             result_message = self._config_set_maxmemory(args)
         elif command == "INFO memory":
+            result_message = self._info_memory_command()
             pass
 
 
@@ -129,6 +154,18 @@ class MiniRedis:
             result_message = self._set_ttl(args)
         elif command == "TTL":
             result_message = self._get_ttl(args)
+
+        elif command == "DEBUG_HEAP":
+            self._print_heap_data()
+        elif command == "DEBUG_LRU":
+            self._print_recent_list()
+        elif command == "DEBUG_HASH":
+            self._print_hash_data()
+            pass
+
+        elif command == "EXIT" or command == "QUIT":
+            return False
+
         else:
             result_message = "(error) ERR unknown command \"" + command +"\"" 
         # 출력
@@ -184,13 +221,15 @@ class MiniRedis:
 
         # 키를 전달하고 만들어진 노드 반환
         recent_node = self.recent_use_list.insert_front(key)
-        print(f"체크 {recent_node.data}")
 
-        print(f"_set command : {key}, {value}, {recent_node}")
+        # print(f"체크 {recent_node.data}")
+        # print(f"_set command : {key}, {value}, {recent_node}")
 
         self.hash_map.put(key, value, None, recent_node)
 
         self.total_bytes += pair_bytes
+
+        return "OK"
 
     # 완료
     def _get_command(self, args):
@@ -203,8 +242,8 @@ class MiniRedis:
         if entry is None:
             return "(nil)"
 
-        print(f"key: {entry.key}")
-        print(f"value: {entry.value}")
+        # print(f"key: {entry.key}")
+        # print(f"value: {entry.value}")
         value_string = "\"" + entry.value + "\""
 
         # 이게 될까?
@@ -233,6 +272,11 @@ class MiniRedis:
         else:
             self.recent_use_list.remove_node(entry.recent_node)
             self.hash_map.remove(key)
+
+            remove_key_bytes = self._get_utf8_size(entry.key)
+            remove_value_bytes = self._get_utf8_size(entry.value)
+            self.total_bytes -= (remove_key_bytes + remove_value_bytes)
+            
             return "(integer) 1" 
 
     def _exists_command(self, args):
@@ -261,14 +305,15 @@ class MiniRedis:
             dl = self.hash_map.keys[i]
             dl_size = dl.get_node_count()
             for _ in range(dl_size):
-                result_message += f"{index}. {dl.get_last_node().data.key}"
+                result_message += f"{index}. \"{dl.get_last_node().data.key}\"\n"
                 dl.move_to_front(dl.get_last_node()) 
                 index += 1
         return result_message
 
 
     def _print_all_keys(self):
-        self.recent_use_list.print_list()
+        # self.recent_use_list.print_list()
+        self.hash_map.print_all()
 
     def _check_validate_size(self, input_bytes):
         if self.max_bytes == 0:
@@ -315,7 +360,7 @@ class MiniRedis:
         # 음수 예외 처리(규정은 없음)
         if value < 0:
             return "[Error] 음수는 불가하다"
-        elif value > 0:
+        elif value == 0:
             self.max_bytes = 10 ** 9
         else:
             # 값 변경
@@ -349,7 +394,7 @@ class MiniRedis:
             self._delete_command(entry.key)
             return "(integer) 1"
 
-        now_time = time.time()
+        now_time = self.current_time
         next_expire_at = now_time + seconds
 
         if entry.expire_at is None:
@@ -392,8 +437,18 @@ class MiniRedis:
 
             return "(Integer) 0(만료)"
 
-    def _print_info_memory_command(self):
-        pass
+    def _info_memory_command(self):
+        result_message = ""
+
+        used_memory = f"used_memory:<{self.total_bytes}>\n"
+        maxmemory = f"maxmemory:<{self.max_bytes}>\n"
+        evicted_keys = f"evicted_keys:<{self.evicted_keys_count}>\n"
+
+        result_message += used_memory
+        result_message += maxmemory
+        result_message += evicted_keys
+
+        return result_message
 
     def _remove_recent_list(self):
         data = self.recent_use_list.remove_back()
@@ -420,25 +475,38 @@ class MiniRedis:
         self.ttl.print_data()
         print("===========================================================\n\n")
 
+    def _print_hash_data(self):
+        print("===================== print_hash_data =====================")
+        self.hash_map.print_all()
+        print("===========================================================\n\n")
+
     def _clear_ttl(self):
 
         print("====================== ttl을 정리합니다 ====================")
         while (True):
             # 빈 경우
-            expire_data = self.ttl.extract_min()
+            expire_data = self.ttl.top()
             if expire_data is None:
                 break
+
 
             expire_at, key = expire_data
             entry = self._find_entry(key)
             if entry is None:
+                self.ttl.extract_min()
                 continue
 
-            if entry.expire_at == expire_at:
-                print(f"삭제할 키: {entry.key} 삭제할 value:{entry.value}")
-                print(f"expire 시간: {entry.expire_at} node:{entry.recent_node}")
-                self._delete_command([entry.key])
+            
 
+            if self.current_time >= expire_at:
+                self.ttl.extract_min()
+
+                if entry.expire_at == expire_at:
+                    print(f"삭제할 키: {entry.key} 삭제할 value:{entry.value}")
+                    print(f"expire 시간: {entry.expire_at} now: {self.current_time} node:{entry.recent_node}")
+                    self._delete_command([entry.key])
+            else:
+                break
         print("==========================================================")
         print()
         

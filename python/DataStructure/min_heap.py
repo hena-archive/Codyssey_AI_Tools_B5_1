@@ -38,6 +38,10 @@ class MinHeap:
         if root is None:
             return None
 
+        if len(self.data) == 1:
+            self.data.pop()
+            return root
+
         # 마지막 요소를 root로 이동
         self.data[0] = self.data.pop()
 

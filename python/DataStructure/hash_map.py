@@ -39,16 +39,20 @@ class HashMap:
         old_keys = self.keys
         self.size *= 2
         self.keys = []
-
+        self.key_count = 0
         # 갱신
+        
         self.threshold = int(self.size * self.load_factor)
+        print(f"Test threash:{self.threshold}")
 
         for _ in range(self.size):
             self.keys.append(DoubleLinkedList())
 
         for double_linked_list in old_keys:
-            k, v = node.get_data()
-            self.put(k, v) if self.size > self.threshold else None
+            datas = double_linked_list.get_list_data()
+            for data in datas:
+
+                self.put(data.key, data.value, data.expire_at, data.recent_node)
 
     # def custom_hash(self, key):
     #     """
@@ -141,7 +145,10 @@ class HashMap:
     def print_all(self):
         for i in range(self.size):
             print(f"Bucket {i}: ", end="")
-            self.keys[i].print_list()
+            datas = self.keys[i].get_list_data()
+            for data in datas:
+                print(f"[{data.key}], ", end="")
+                
             print()
 
     def get_keys_array(self):
